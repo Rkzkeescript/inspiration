@@ -1,0 +1,189 @@
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "RkzkeeHub"
+gui.ResetOnSpawn = false
+gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Rainbow Effect for GUI
+local function createRainbowEffect(frame)
+    local hue = 0
+    game:GetService("RunService").RenderStepped:Connect(function()
+        hue = (hue + 0.01) % 1
+        frame.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+    end)
+end
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0.3, 0, 0.4, 0)
+frame.Position = UDim2.new(0.35, 0, 0.3, 0)
+frame.BackgroundTransparency = 0.2
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+createRainbowEffect(frame)
+
+-- Title Label
+local title = Instance.new("TextLabel")
+title.Text = "RkzkeeHub"
+title.Size = UDim2.new(1, 0, 0.2, 0)
+title.BackgroundTransparency = 1
+title.TextScaled = true
+title.Font = Enum.Font.FredokaOne
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Parent = frame
+
+-- Toggle Aim Assist Button
+local aimToggleButton = Instance.new("TextButton")
+aimToggleButton.Text = "Aim Assist: OFF"
+aimToggleButton.Size = UDim2.new(0.8, 0, 0.15, 0)
+aimToggleButton.Position = UDim2.new(0.1, 0, 0.3, 0)
+aimToggleButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+aimToggleButton.TextScaled = true
+aimToggleButton.Font = Enum.Font.Gotham
+aimToggleButton.TextColor3 = Color3.new(1, 1, 1)
+aimToggleButton.Parent = frame
+
+-- Toggle Wall Check
+local wallCheckButton = Instance.new("TextButton")
+wallCheckButton.Text = "Wall Check: ON"
+wallCheckButton.Size = UDim2.new(0.8, 0, 0.15, 0)
+wallCheckButton.Position = UDim2.new(0.1, 0, 0.5, 0)
+wallCheckButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+wallCheckButton.TextScaled = true
+wallCheckButton.Font = Enum.Font.Gotham
+wallCheckButton.TextColor3 = Color3.new(1, 1, 1)
+wallCheckButton.Parent = frame
+
+-- Toggle Team Check
+local teamCheckButton = Instance.new("TextButton")
+teamCheckButton.Text = "Team Check: ON"
+teamCheckButton.Size = UDim2.new(0.8, 0, 0.15, 0)
+teamCheckButton.Position = UDim2.new(0.1, 0, 0.7, 0)
+teamCheckButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+teamCheckButton.TextScaled = true
+teamCheckButton.Font = Enum.Font.Gotham
+teamCheckButton.TextColor3 = Color3.new(1, 1, 1)
+teamCheckButton.Parent = frame
+
+-- Status Variables
+local aimAssistEnabled = false
+local wallCheckEnabled = true
+local teamCheckEnabled = true
+local targetPlayer = nil
+
+-- Function to Check Line of Sight (Wall Check)
+local function hasLineOfSight(player)
+    if not wallCheckEnabled then return true end
+    local camera = workspace.CurrentCamera
+    local character = player.Character
+    if not character or not character:FindFirstChild("Head") then return false end
+
+    local head = character.Head
+    local origin = camera.CFrame.Position
+    local direction = (head.Position - origin).Unit * 1000
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {workspace.Ignore, game.Players.LocalPlayer.Character}
+
+    local result = workspace:Raycast(origin, direction, params)
+    return result and result.Instance:IsDescendantOf(character)
+end
+
+-- Function to Check Team (Team Check)
+local function isEnemy(player)
+    if not teamCheckEnabled then return true end
+    local localPlayer = game.Players.LocalPlayer
+    return player.Team ~= localPlayer.Team
+end
+
+-- Function to Find Closest Player
+local function findClosestPlayer()
+    local player = game.Players.LocalPlayer
+    local camera = workspace.CurrentCamera
+    local shortestDistance = math.huge
+    local closestPlayer = nil
+
+    for _, otherPlayer in pairs(game.Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Head") and isEnemy(otherPlayer) and hasLineOfSight(otherPlayer) then
+            local head = otherPlayer.Character.Head
+            local screenPoint, onScreen = camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local mousePosition = game:GetService("UserInputService"):GetMouseLocation()
+                local distance = (Vector2.new(mousePosition.X, mousePosition.Y) - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = otherPlayer
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+-- Function to Aim at Target
+local function aimAtTarget()
+    if not aimAssistEnabled or not targetPlayer then return end
+
+    local camera = workspace.CurrentCamera
+    local character = targetPlayer.Character
+    if character and character:FindFirstChild("Head") then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, character.Head.Position)
+    else
+        aimAssistEnabled = false
+        aimToggleButton.Text = "Aim Assist: OFF"
+        targetPlayer = nil
+    end
+end
+
+-- Toggle Aim Assist
+aimToggleButton.MouseButton1Click:Connect(function()
+    if aimAssistEnabled then
+        aimAssistEnabled = false
+        aimToggleButton.Text = "Aim Assist: OFF"
+        targetPlayer = nil
+    else
+        targetPlayer = findClosestPlayer()
+        if targetPlayer then
+            aimAssistEnabled = true
+            aimToggleButton.Text = "Aim Assist: ON"
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "RkzkeeHub",
+                Text = "Target locked on: " .. targetPlayer.Name,
+                Duration = 5
+            })
+        else
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "RkzkeeHub",
+                Text = "No valid target found.",
+                Duration = 5
+            })
+        end
+    end
+end)
+
+-- Toggle Wall Check
+wallCheckButton.MouseButton1Click:Connect(function()
+    wallCheckEnabled = not wallCheckEnabled
+    wallCheckButton.Text = "Wall Check: " .. (wallCheckEnabled and "ON" or "OFF")
+end)
+
+-- Toggle Team Check
+teamCheckButton.MouseButton1Click:Connect(function()
+    teamCheckEnabled = not teamCheckEnabled
+    teamCheckButton.Text = "Team Check: " .. (teamCheckEnabled and "ON" or "OFF")
+end)
+
+-- Monitor and Aim
+game:GetService("RunService").RenderStepped:Connect(function()
+    aimAtTarget()
+end)
+
+-- Notify Player
+game.StarterGui:SetCore("SendNotification", {
+    Title = "RkzkeeHub",
+    Text = "Aim Assist GUI Initialized",
+    Duration = 5
+})
